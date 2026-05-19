@@ -1,0 +1,2532 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手工線派工作業排程系統</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --background: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --card-bg: rgba(15, 23, 42, 0.55);
+            --text-main: #f8fafc;
+            --text-light: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            --radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+        }
+
+        /* Custom Scrollbar */
+        *::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text-main);
+            margin: 0;
+            padding: 1.5rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.2rem;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-left h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #a5b4fc, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-left p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        /* Responsive 3 Column Grid Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 0.8fr 2.1fr 2.1fr;
+            gap: 1.2rem;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Column Panels */
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .panel-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-action {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .btn-action:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+
+        .btn-success:hover {
+            background-color: var(--success-hover);
+        }
+
+        /* Drag Zone Indicator */
+        .drag-zone {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 2px dashed rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .drag-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .empty-placeholder {
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            gap: 0.4rem;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* Backlog Cards */
+        .task-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.55rem 0.7rem;
+            cursor: grab;
+            transition: all 0.2s ease;
+            user-select: none;
+            position: relative;
+        }
+
+        .task-card:active {
+            cursor: grabbing;
+        }
+
+        .task-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            background: rgba(30, 41, 59, 0.9);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.4rem;
+        }
+
+        .category-tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        /* Category Color Sets */
+        .tag-蕈類 {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .tag-蔬菜 {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .tag-乾類 {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fde047;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .tag-生菜 {
+            background: rgba(20, 184, 166, 0.2);
+            color: #99f6e4;
+            border: 1px solid rgba(20, 184, 166, 0.3);
+        }
+
+        .tag-其他 {
+            background: rgba(139, 92, 246, 0.2);
+            color: #ddd6fe;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .card-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            color: var(--text-main);
+        }
+
+        .card-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .qty-input {
+            width: 80px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 0.3rem 0.4rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .qty-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 0.3rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .icon-btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .icon-btn-primary {
+            background: rgba(99, 102, 241, 0.1);
+            color: #a5b4fc;
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        .icon-btn-primary:hover {
+            background: rgba(99, 102, 241, 0.25);
+            color: white;
+        }
+
+        /* Time badge on cards */
+        .time-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Scheduled Table Style */
+        .schedule-table-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th,
+        td {
+            padding: 0.55rem 0.7rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: rgba(15, 23, 42, 0.8);
+            font-weight: 500;
+            color: var(--text-light);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Summary Card */
+        .summary-card {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+        }
+
+        .summary-info h3 {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .summary-info p {
+            margin: 0.2rem 0 0 0;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: baseline;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+        }
+
+        .summary-info p span {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        /* MODAL DIALOGS */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 850px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transform: scale(0.95);
+            transition: all 0.3s ease;
+        }
+
+        #batchModalOverlay .modal {
+            max-width: 1200px;
+            width: 95%;
+            height: 90vh;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 1.2rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            flex-grow: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .modal-sidebar {
+            width: 200px;
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.2);
+        }
+
+        .category-filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-light);
+            text-align: left;
+            padding: 0.6rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .category-filter-btn:hover,
+        .category-filter-btn.active {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .category-filter-btn.active {
+            background: var(--primary);
+            font-weight: 500;
+        }
+
+        .modal-content {
+            flex-grow: 1;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            gap: 1rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-text {
+            flex-grow: 1;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .input-text:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .db-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        .db-item-row {
+            display: flex;
+            align-items: center;
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .db-item-row:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .db-item-checkbox {
+            margin-right: 1rem;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .db-item-details {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: 2.2fr 1.2fr 1fr;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .db-item-details .name {
+            font-weight: 500;
+        }
+
+        .db-item-details .spec {
+            color: var(--text-light);
+        }
+
+        .db-item-details .speed {
+            color: #34d399;
+            font-size: 0.85rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* COLLAPSIBLE FLOATING CALCULATOR */
+        .calculator-fab {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.5);
+            z-index: 99;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 1.5rem;
+        }
+
+        .calculator-fab:hover {
+            transform: scale(1.1);
+            background-color: var(--primary-hover);
+        }
+
+        .calculator-panel {
+            position: fixed;
+            bottom: 95px;
+            right: 25px;
+            width: 360px;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(20px) scale(0.95);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+        }
+
+        .calculator-panel.active {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .calc-header {
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .calc-body {
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .calc-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .calc-select {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 0.6rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .calc-select option {
+            background-color: #1e293b;
+        }
+
+        .calc-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.5rem 0;
+            position: relative;
+        }
+
+        .calc-divider span {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e293b;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .calc-speed-indicator {
+            font-size: 0.85rem;
+            color: var(--success);
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            padding: 0.5rem;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* Drag-and-drop row styling */
+        tbody tr[draggable="true"] {
+            cursor: grab;
+        }
+
+        tbody tr[draggable="true"]:active {
+            cursor: grabbing;
+        }
+
+        #scheduleTableBodyA tr.dragover-row {
+            border-top: 2px solid #f43f5e !important;
+            background: rgba(244, 63, 94, 0.1) !important;
+        }
+
+        #scheduleTableBodyB tr.dragover-row {
+            border-top: 2px solid #3b82f6 !important;
+            background: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        /* PRINT STYLING - SIMPLIFIED SYSTEM FOR PREVIEW SHEETS */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+            }
+
+            header,
+            .panel,
+            .calculator-fab,
+            .calculator-panel,
+            .btn-action,
+            .icon-btn,
+            input,
+            select,
+            .summary-card,
+            .modal-header,
+            .modal-footer {
+                display: none !important;
+            }
+
+            .modal-overlay {
+                position: static !important;
+                background: transparent !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+
+            .modal {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                transform: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .modal-body {
+                overflow: visible !important;
+                padding: 0 !important;
+            }
+
+            #previewPrintArea {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                color: black !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-left">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#indigoGrad)" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <defs>
+                    <linearGradient id="indigoGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#a5b4fc" />
+                        <stop offset="100%" stop-color="#6366f1" />
+                    </linearGradient>
+                </defs>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+                <path d="M8 14h.01"></path>
+                <path d="M12 14h.01"></path>
+                <path d="M16 14h.01"></path>
+                <path d="M8 18h.01"></path>
+                <path d="M12 18h.01"></path>
+                <path d="M16 18h.01"></path>
+            </svg>
+            <div>
+                <h1>手工線作業排程系統</h1>
+                <p>理貨部作業排程面板 • 雙區塊獨立派工運算</p>
+            </div>
+        </div>
+
+        <!-- 今日全線總預估耗時及狀態數據合併區 -->
+        <div style="display: flex; align-items: center; gap: 1.2rem; background: rgba(30, 41, 59, 0.45); padding: 0.5rem 1.2rem; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column; justify-content: center;">
+                <span style="font-size: 0.72rem; color: var(--text-light); text-transform: uppercase;">今日全線總預估耗時</span>
+                <span id="totalTimeDisplay" style="font-size: 1.2rem; font-weight: bold; color: #a5b4fc; margin-top: 0.1rem; display: flex; align-items: baseline; gap: 0.15rem;">0 <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-light);">分鐘</span></span>
+            </div>
+            
+            <div style="width: 1px; height: 30px; background: rgba(255, 255, 255, 0.15);"></div>
+            
+            <div style="font-size: 0.75rem; color: var(--text-light); line-height: 1.45;">
+                A區排程: <span id="summaryCountA" style="color: white; font-weight: bold;">0</span> 項 | B區排程: <span id="summaryCountB" style="color: white; font-weight: bold;">0</span> 項<br>
+                總排程數: <span id="summaryItemCount" style="color: white; font-weight: bold;">0</span> 項 | 總計產出量: <span id="summaryTotalQty" style="color: white; font-weight: bold;">0</span>
+            </div>
+            
+            <div style="width: 1px; height: 30px; background: rgba(255, 255, 255, 0.15);"></div>
+            
+            <div style="display: flex; gap: 0.4rem;">
+                <button class="btn-action btn-success" id="btnOpenPreview" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; display: flex; align-items: center;">
+                    👁️ 預覽派工
+                </button>
+                <button class="btn-action icon-btn-danger" id="btnClearScheduled"
+                    style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.22); color: #f87171; padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer; height: 32px; display: flex; align-items: center;">
+                    清空排程
+                </button>
+            </div>
+        </div>
+
+        <div style="font-size: 0.9rem; color: var(--text-light);" id="currentTime">
+            加載時間中...
+        </div>
+    </header>
+
+    <div class="main-container" style="margin-bottom: 1.2rem;">
+        <!-- Left: Backlog Pool -->
+        <div class="panel" style="height: calc(100vh - 150px); min-height: 520px;">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>📦 待派工池 (品項選取)</span>
+                    <span style="font-size: 0.85rem; color: var(--text-light); font-weight: 400;" id="backlogCount">(共 0
+                        項)</span>
+                </div>
+                <button class="btn-action" id="btnOpenBatch">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        <line x1="12" y1="11" x2="12" y2="17"></line>
+                        <line x1="9" y1="14" x2="15" y2="14"></line>
+                    </svg>
+                    批次選取
+                </button>
+            </div>
+
+            <div style="margin-bottom: 0.8rem; display: flex; gap: 0.5rem; align-items: center;">
+                <input type="text" class="input-text" id="backlogSearch" placeholder="搜尋此池中的品項名稱..."
+                    style="padding: 0.45rem 0.8rem; font-size: 0.85rem; flex-grow: 1; margin: 0;">
+                <select class="calc-select" id="quickGroupSelect"
+                    style="padding: 0.45rem 0.8rem; font-size: 0.85rem; width: auto; max-width: 155px; margin: 0; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.3); color: #c7d2fe; cursor: pointer;">
+                    <option value="" disabled selected>⚡ 快速群組選入</option>
+                    <!-- Unique groups populated by JS -->
+                </select>
+            </div>
+
+            <div class="drag-zone" id="backlogZone" ondragover="allowDrop(event)" ondrop="dropToBacklog(event)">
+                <div class="empty-placeholder" id="backlogPlaceholder">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>尚未選入品項<br>請點選「批次選取」或使用「快速群組選入」</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle: Area A Sub-panel (Side-by-side!) -->
+        <div class="panel"
+            style="height: calc(100vh - 150px); min-height: 520px; display: flex; flex-direction: column;">
+            <div class="panel-header">
+                <div class="panel-title" style="color: #f43f5e; font-weight: bold;">
+                    <span>🔴 A 區排程</span>
+                    <span style="font-size: 0.8rem; color: var(--text-light); font-weight: 400;" id="countA">(共 0
+                        項)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <label style="font-size: 0.85rem; color: var(--text-light);">配置:</label>
+                    <input type="number" id="workersInputA" value="2" min="1" class="qty-input"
+                        style="width: 44px; background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.3); font-weight: bold; color: #f43f5e; padding: 0.2rem 0.3rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-light);">人</span>
+                </div>
+            </div>
+
+            <!-- Capacity Progress Bar Container for Area A -->
+            <div class="capacity-meter"
+                style="margin-bottom: 0.6rem; background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.15); padding: 0.5rem 0.8rem; border-radius: 10px;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.3rem;">
+                    <span>額定總工時: <strong id="capacityTextA" style="color: white; font-weight: bold;">16 小時 (960
+                            分)</strong></span>
+                    <span>工時佔用率: <strong id="occupancyPctTextA"
+                            style="color: #10b981; font-weight: bold;">0%</strong></span>
+                </div>
+                <!-- Progress Line -->
+                <div
+                    style="background: rgba(255,255,255,0.05); height: 6px; border-radius: 3px; overflow: hidden; position: relative;">
+                    <div id="progressBarFillA"
+                        style="width: 0%; height: 100%; background: linear-gradient(to right, #10b981, #34d399); border-radius: 3px; transition: width 0.3s ease, background 0.3s ease;">
+                    </div>
+                </div>
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-light); margin-top: 0.25rem;">
+                    <span>已排產: <span id="scheduledTimeTextA" style="color: white;">0 分</span></span>
+                    <span>剩餘可用: <span id="remainingTimeTextA" style="color: white; font-weight: 500;">960
+                            分</span></span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 0.5rem; text-align: right;">
+                <span class="time-badge" id="subtotalA"
+                    style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; padding: 0.25rem 0.6rem; font-weight: bold; font-size: 0.82rem; display: inline-block;">小計:
+                    0 分鐘</span>
+            </div>
+
+            <div class="drag-zone" id="scheduledZoneA" ondragover="allowDrop(event)" ondrop="dropToScheduledA(event)"
+                style="background: rgba(15, 23, 42, 0.15); flex-grow: 1;">
+                <div class="schedule-table-container" id="tableContainerA"
+                    style="display: none; width: 100%; border-color: rgba(244, 63, 94, 0.15); flex-grow: 1;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>品項</th>
+                                <th style="width: 65px;">規格</th>
+                                <th style="text-align: center; width: 85px;">數量</th>
+                                <th style="text-align: right; width: 90px;">估計工時</th>
+                                <th style="text-align: center; width: 120px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBodyA">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-placeholder" id="placeholderA" style="font-size: 0.8rem; gap: 0.3rem;">
+                    <span>拖曳卡片至此，或點左側「排 A ➔」鍵</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Area B Sub-panel (Side-by-side!) -->
+        <div class="panel"
+            style="height: calc(100vh - 150px); min-height: 520px; display: flex; flex-direction: column;">
+            <div class="panel-header">
+                <div class="panel-title" style="color: #3b82f6; font-weight: bold;">
+                    <span>🔵 B 區排程</span>
+                    <span style="font-size: 0.8rem; color: var(--text-light); font-weight: 400;" id="countB">(共 0
+                        項)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <label style="font-size: 0.85rem; color: var(--text-light);">配置:</label>
+                    <input type="number" id="workersInputB" value="1" min="1" class="qty-input"
+                        style="width: 44px; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); font-weight: bold; color: #3b82f6; padding: 0.2rem 0.3rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-light);">人</span>
+                </div>
+            </div>
+
+            <!-- Capacity Progress Bar Container for Area B -->
+            <div class="capacity-meter"
+                style="margin-bottom: 0.6rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); padding: 0.5rem 0.8rem; border-radius: 10px;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-light); margin-bottom: 0.3rem;">
+                    <span>額定總工時: <strong id="capacityTextB" style="color: white; font-weight: bold;">8 小時 (480
+                            分)</strong></span>
+                    <span>工時佔用率: <strong id="occupancyPctTextB"
+                            style="color: #10b981; font-weight: bold;">0%</strong></span>
+                </div>
+                <!-- Progress Line -->
+                <div
+                    style="background: rgba(255,255,255,0.05); height: 6px; border-radius: 3px; overflow: hidden; position: relative;">
+                    <div id="progressBarFillB"
+                        style="width: 0%; height: 100%; background: linear-gradient(to right, #10b981, #34d399); border-radius: 3px; transition: width 0.3s ease, background 0.3s ease;">
+                    </div>
+                </div>
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-light); margin-top: 0.25rem;">
+                    <span>已排產: <span id="scheduledTimeTextB" style="color: white;">0 分</span></span>
+                    <span>剩餘可用: <span id="remainingTimeTextB" style="color: white; font-weight: 500;">480
+                            分</span></span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 0.5rem; text-align: right;">
+                <span class="time-badge" id="subtotalB"
+                    style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 0.25rem 0.6rem; font-weight: bold; font-size: 0.82rem; display: inline-block;">小計:
+                    0 分鐘</span>
+            </div>
+
+            <div class="drag-zone" id="scheduledZoneB" ondragover="allowDrop(event)" ondrop="dropToScheduledB(event)"
+                style="background: rgba(15, 23, 42, 0.15); flex-grow: 1;">
+                <div class="schedule-table-container" id="tableContainerB"
+                    style="display: none; width: 100%; border-color: rgba(59, 130, 246, 0.15); flex-grow: 1;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>品項</th>
+                                <th style="width: 65px;">規格</th>
+                                <th style="text-align: center; width: 85px;">數量</th>
+                                <th style="text-align: right; width: 90px;">估計工時</th>
+                                <th style="text-align: center; width: 120px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBodyB">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-placeholder" id="placeholderB" style="font-size: 0.8rem; gap: 0.3rem;">
+                    <span>拖曳卡片至此，或點左側「排 B ➔」鍵</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BATCH SELECTION MODAL -->
+    <div class="modal-overlay" id="batchModalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">📦 從資料庫批次選取品項</div>
+                <button class="modal-close" id="btnCloseBatch">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Sidebar Category/Group Filter -->
+                <div class="modal-sidebar" id="modalSidebar">
+                    <!-- Populated by JS dynamically with Categories & Groups -->
+                </div>
+                <!-- Main Content Area -->
+                <div class="modal-content">
+                    <div class="search-bar">
+                        <input type="text" class="input-text" id="modalSearchInput"
+                            placeholder="輸入關鍵字快速篩選品項 (名稱或規格)...">
+                    </div>
+                    <div class="db-list-container">
+                        <div
+                            style="display: flex; align-items: center; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); background: rgba(15, 23, 42, 0.5); font-weight: 500; font-size: 0.85rem; color: var(--text-light);">
+                            <input type="checkbox" id="selectAllCheckbox"
+                                style="margin-right: 1rem; width: 18px; height: 18px;">
+                            <div
+                                style="flex-grow: 1; display: grid; grid-template-columns: 2.2fr 1.2fr 1fr; gap: 1rem;">
+                                <span>品項名稱</span>
+                                <span>包裝規格</span>
+                                <span>產速 (件/分人)</span>
+                            </div>
+                        </div>
+                        <div id="dbListBody">
+                            <!-- Checkbox rows populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="modalSelectedCounter" style="font-size: 0.9rem; color: var(--text-light);">已選擇 0 個項目</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-action"
+                        style="background: transparent; border: 1px solid var(--border); color: var(--text-light);"
+                        id="btnCancelBatch">取消</button>
+                    <button class="btn-action btn-success" id="btnConfirmBatch">確認加入待派工池</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREVIEW DISPATCH MODAL -->
+    <div class="modal-overlay" id="previewModalOverlay">
+        <div class="modal" style="max-width: 1000px; width: 90%; height: auto; max-height: 90vh;">
+            <div class="modal-header">
+                <div class="modal-title">👁️ 今日手工線派工預覽</div>
+                <button class="modal-close" id="btnClosePreview">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem; flex-direction: column; overflow-y: auto;">
+                <!-- Document Sheet -->
+                <div id="previewPrintArea"
+                    style="background: white; color: #1e293b; padding: 1.5rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); font-family: monospace, sans-serif; font-size: 0.95rem; line-height: 1.6;">
+                    <!-- Filled dynamically by JS -->
+                </div>
+            </div>
+            <div class="modal-footer" style="background: rgba(15,23,42,0.15);">
+                <button class="btn-action" id="btnCopyPreviewText" style="background: #6366f1; color: white;">
+                    📋 複製派工文字 (Line)
+                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-action"
+                        style="background: transparent; border: 1px solid var(--border); color: var(--text-light);"
+                        id="btnCancelPreview">關閉</button>
+                    <button class="btn-action btn-success" id="btnPrintPreview">🖨️ 列印派工單</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLLAPSIBLE FLOATING CALCULATOR PANEL -->
+    <div class="calculator-fab" id="calcFab" title="開啟快速產能換算器">
+        🧮
+    </div>
+
+    <div class="calculator-panel" id="calcPanel">
+        <div class="calc-header">
+            <span style="font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">🧮 快速產能換算器</span>
+            <button class="modal-close" id="btnCloseCalc" style="font-size: 1.1rem;">✕</button>
+        </div>
+        <div class="calc-body">
+            <div class="calc-row">
+                <label style="font-size: 0.85rem; color: var(--text-light);">模糊搜尋品項</label>
+                <input type="text" class="input-text" id="calcSearchInput" placeholder="🔍 輸入關鍵字模糊搜尋品項..."
+                    style="font-size: 0.82rem; padding: 0.35rem 0.6rem; margin-bottom: 0.4rem; width: 100%;">
+                <select class="calc-select" id="calcItemSelect">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
+            <div class="calc-row">
+                <label style="font-size: 0.85rem; color: var(--text-light);">配置工作人數 (人)</label>
+                <input type="number" class="qty-input" id="calcWorkersInput" value="1" min="1"
+                    style="width: 100%; text-align: left;">
+            </div>
+
+            <div class="calc-speed-indicator" id="calcSpeedIndicator">
+                作業速度: - / 分鐘
+            </div>
+
+            <div class="calc-divider"><span>模式 A：數量換算時間 (多團隊作業)</span></div>
+
+            <div class="calc-row">
+                <label style="font-size: 0.85rem; color: var(--text-light);">想要產出數量</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="number" class="qty-input" id="calcQtyInput" placeholder="輸入數量"
+                        style="width: 100%; text-align: left;">
+                    <span style="font-size: 0.9rem; color: var(--text-light);" id="calcSpecLabel">單位</span>
+                </div>
+            </div>
+            <div class="calc-row" style="margin-top: -0.2rem;">
+                <span style="font-size: 0.85rem; color: var(--text-light);">👉 預估所需總耗時：<br><strong id="calcTimeResult"
+                        style="color: var(--primary); font-size: 1rem; line-height: 1.5;">0 分鐘</strong></span>
+            </div>
+
+            <div class="calc-divider"><span>模式 B：可用時間換算產能 (多團隊作業)</span></div>
+
+            <div class="calc-row">
+                <label style="font-size: 0.85rem; color: var(--text-light);">可用工作時間 (分鐘)</label>
+                <input type="number" class="qty-input" id="calcTimeInput" placeholder="輸入分鐘"
+                    style="width: 100%; text-align: left;">
+            </div>
+            <div class="calc-row" style="margin-top: -0.2rem;">
+                <span style="font-size: 0.85rem; color: var(--text-light);">👉 預估可生產總量：<strong id="calcQtyResult"
+                        style="color: var(--success); font-size: 1.05rem;">0</strong> <span id="calcUnitLabel"
+                        style="color: var(--success); font-weight: 500;">件</span></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================================
+        // 📝 商品資料庫：直接包含您提供的 75 個真實品項
+        // ========================================================
+        const database = [
+            { id: "ITEM_1", category: "蕈類", itemCode: "A010A0102", name: "香菇［大-特］", spec: "台斤", process: "大菇", speedPerMin: 0.42, materialName: "大菇", warehouse: "63-7" },
+            { id: "ITEM_2", category: "蕈類", itemCode: "A010B0103", name: "香菇［中-特］", spec: "台斤", process: "中菇", speedPerMin: 0.42, materialName: "中菇", warehouse: "63-7" },
+            { id: "ITEM_3", category: "蕈類", itemCode: "A010C0102", name: "香菇［小-特］", spec: "台斤", process: "小菇", speedPerMin: 0.42, materialName: "小菇", warehouse: "63-7" },
+            { id: "ITEM_4", category: "蕈類", itemCode: "A01000104", name: "特挑香菇［7-9cm］", spec: "kg", process: "大菇", speedPerMin: 0.4, materialName: "大菇", warehouse: "63-7" },
+            { id: "ITEM_5", category: "蕈類", itemCode: "A01000115", name: "香菇［條碼］", spec: "400g/盒", process: "大菇", speedPerMin: 0.81, materialName: "大菇", warehouse: "63-7" },
+            { id: "ITEM_6", category: "蕈類", itemCode: "A010B0104", name: "開源社-香菇［中］", spec: "kg", process: "大菇", speedPerMin: 0.5, materialName: "中菇或大菇", warehouse: "63-7" },
+            { id: "ITEM_7", category: "蕈類", itemCode: "A01000103", name: "日燦-特挑香菇［4.5-6.5cm］", spec: "kg", process: "中菇", speedPerMin: 0.34, materialName: "中菇", warehouse: "63-7" },
+            { id: "ITEM_8", category: "蕈類", itemCode: "A010B0101", name: "香菇［中］", spec: "600g/盒", process: "中菇", speedPerMin: 0.16, materialName: "中菇", warehouse: "63-7" },
+            { id: "ITEM_9", category: "蕈類", itemCode: "A010B0102", name: "去蒂香菇［中］", spec: "kg", process: "中菇", speedPerMin: 0.5, materialName: "履歷中菇", warehouse: "63-7" },
+            { id: "ITEM_10", category: "蕈類", itemCode: "A01000116", name: "台茂-特挑香菇［4-6cm］", spec: "1kg/包", process: "中菇", speedPerMin: 0.51, materialName: "中菇", warehouse: "63-7" },
+            { id: "ITEM_11", category: "蕈類", itemCode: "A01000113", name: "生展-特挑香菇［5-7cm］", spec: "kg", process: "中菇", speedPerMin: 0.45, materialName: "中菇", warehouse: "63-7" },
+            { id: "ITEM_12", category: "蕈類", itemCode: "A01000110", name: "生展-特挑香菇［4-6cm］", spec: "kg", process: "小菇", speedPerMin: 0.5, materialName: "小菇", warehouse: "63-7" },
+            { id: "ITEM_13", category: "蕈類", itemCode: "A01000105", name: "王品-特挑香菇［4-6cm］", spec: "kg", process: "小菇", speedPerMin: 0.3, materialName: "小菇", warehouse: "63-7" },
+            { id: "ITEM_14", category: "蕈類", itemCode: "A010D0101", name: "香菇［小小］", spec: "600g/包", process: "小小", speedPerMin: 0.9, materialName: "小小", warehouse: "63-7" },
+            { id: "ITEM_15", category: "蕈類", itemCode: "A010D0101", name: "香菇［小小］", spec: "300g/包", process: "小小", speedPerMin: 1.47, materialName: "小小", warehouse: "63-7" },
+            { id: "ITEM_16", category: "蕈類", itemCode: "A010D0101", name: "香菇［小小］", spec: "500g/包", process: "小小", speedPerMin: 1.15, materialName: "小小", warehouse: "63-7" },
+            { id: "ITEM_17", category: "蕈類", itemCode: "A030A0101", name: "木耳［大］", spec: "台斤", process: "木耳", speedPerMin: 0.4, materialName: "有機木耳A", warehouse: "63-7" },
+            { id: "ITEM_18", category: "蕈類", itemCode: "A030A0103", name: "輕井澤-木耳［大］", spec: "台斤", process: "木耳", speedPerMin: 0.83, materialName: "一般大耳", warehouse: "63-7" },
+            { id: "ITEM_19", category: "蕈類", itemCode: "A030B0101", name: "木耳［小］", spec: "台斤", process: "木耳", speedPerMin: 1.48, materialName: "有機木耳B", warehouse: "63-7" },
+            { id: "ITEM_20", category: "蔬菜", itemCode: "E020B0101", name: "小黃瓜", spec: "600g/包", process: "一般", speedPerMin: 1.4, materialName: "小黃瓜", warehouse: "63-5低溫倉" },
+            { id: "ITEM_21", category: "蔬菜", itemCode: "G030A0101", name: "牛番茄L", spec: "1公斤/包", process: "番茄", speedPerMin: 0.86, materialName: "牛番茄-L", warehouse: "63-7" },
+            { id: "ITEM_22", category: "蔬菜", itemCode: "G030B0101", name: "牛番茄M", spec: "1公斤/包", process: "番茄", speedPerMin: 0.86, materialName: "牛番茄-M", warehouse: "63-7" },
+            { id: "ITEM_23", category: "蔬菜", itemCode: "G030C0101", name: "牛番茄S", spec: "1公斤/包", process: "番茄", speedPerMin: 0.86, materialName: "牛番茄-S", warehouse: "63-7" },
+            { id: "ITEM_24", category: "蔬菜", itemCode: "R07000103", name: "生鮮蒜仁", spec: "3kg/包", process: "蒜頭", speedPerMin: 1.11, materialName: "進口蒜仁", warehouse: "63-7" },
+            { id: "ITEM_25", category: "蔬菜", itemCode: "R07000103", name: "生鮮蒜仁", spec: "600g/包", process: "蒜頭", speedPerMin: 0.54, materialName: "進口蒜仁", warehouse: "63-7" },
+            { id: "ITEM_26", category: "蔬菜", itemCode: "R07000102", name: "生鮮蒜仁［大仁］", spec: "600g/包", process: "蒜頭", speedPerMin: 0.43, materialName: "進口大仁", warehouse: "63-7" },
+            { id: "ITEM_27", category: "蔬菜", itemCode: "L030A0102", name: "日本山藥［4L］", spec: "kg", process: "一般", speedPerMin: 1.33, materialName: "山藥", warehouse: "63-7" },
+            { id: "ITEM_28", category: "蔬菜", itemCode: "J02000101", name: "青蔥", spec: "1K/把", process: "一般", speedPerMin: 1.01, materialName: "青蔥", warehouse: "63-7" },
+            { id: "ITEM_29", category: "蕈類", itemCode: "A020C0101", name: "杏鮑菇C", spec: "200g/盒", process: "一般", speedPerMin: 0.9, materialName: "杏C", warehouse: "63-6" },
+            { id: "ITEM_30", category: "蕈類", itemCode: "A010C0101", name: "香菇［小］", spec: "150g/盒", process: "小菇", speedPerMin: 0.9, materialName: "小菇", warehouse: "63-6" },
+            { id: "ITEM_31", category: "蕈類", itemCode: "A09000101", name: "秀珍菇［26托盤］", spec: "150g/盒", process: "一般", speedPerMin: 0.82, materialName: "秀A", warehouse: "63-6" },
+            { id: "ITEM_32", category: "蔬菜", itemCode: "G02000201", name: "履歷水果彩椒［26托盤］", spec: "160g/盒", process: "一般", speedPerMin: 0.79, materialName: "彩椒", warehouse: "63-5低溫倉" },
+            { id: "ITEM_33", category: "乾類", itemCode: "A250D0101", name: "乾香菇［小鈕］", spec: "80g/包", process: "一般", speedPerMin: 1, materialName: "小鈕", warehouse: "63-5低溫倉" },
+            { id: "ITEM_34", category: "乾類", itemCode: "A250B0101", name: "乾香菇［大中］", spec: "250g/包", process: "一般", speedPerMin: 0.67, materialName: "大中", warehouse: "63-5低溫倉" },
+            { id: "ITEM_35", category: "蕈類", itemCode: "A04000304", name: "有機銀耳［袋裝］", spec: "150g/包", process: "一般", speedPerMin: 1.33, materialName: "銀耳", warehouse: "63-6理貨倉" },
+            { id: "ITEM_36", category: "蔬菜", itemCode: "G04000104", name: "大辣椒", spec: "600g/包", process: "辣椒", speedPerMin: 0.23, materialName: "大辣椒", warehouse: "63-7" },
+            { id: "ITEM_37", category: "蔬菜", itemCode: "G04000105", name: "小辣椒", spec: "600g/包", process: "辣椒", speedPerMin: 0.23, materialName: "小辣椒", warehouse: "63-7" },
+            { id: "ITEM_38", category: "蔬菜", itemCode: "G04000108", name: "去蒂小辣椒", spec: "600g/包", process: "辣椒", speedPerMin: 0.13, materialName: "小辣椒600g", warehouse: "63-6理貨倉" },
+            { id: "ITEM_39", category: "乾類", itemCode: "Q11000101", name: "乾香菇絲", spec: "kg", process: "一般", speedPerMin: 0.06, materialName: "乾香菇絲", warehouse: "63-5低溫倉" },
+            { id: "ITEM_40", category: "乾類", itemCode: "Q11000103", name: "味丹-乾香菇絲", spec: "kg", process: "一般", speedPerMin: 0.13, materialName: "乾香菇絲", warehouse: "63-5低溫倉" },
+            { id: "ITEM_41", category: "加工品", itemCode: "R02000303", name: "有機銀耳露禮盒", spec: "件", process: "一般", speedPerMin: 0, materialName: "銀耳露", warehouse: "常溫倉" },
+            { id: "ITEM_42", category: "香菇", itemCode: "A01000101", name: "香菇［直腳］", spec: "kg", process: "直腳", speedPerMin: 0, materialName: "直腳", warehouse: "63-7" },
+            { id: "ITEM_43", category: "蔬菜", itemCode: "D05000105", name: "紫洋蔥［帶皮］", spec: "1公斤/包", process: "一般", speedPerMin: 1.4, materialName: "紫洋蔥", warehouse: "63-5低溫倉" },
+            { id: "ITEM_44", category: "蕈類", itemCode: "A010A0101", name: "香菇［大］", spec: "1kg/包", process: "大菇", speedPerMin: 1.3, materialName: "大菇", warehouse: "63-6" },
+            { id: "ITEM_45", category: "蕈類", itemCode: "A010C0101", name: "香菇［小］", spec: "1kg/包", process: "小菇", speedPerMin: 1.62, materialName: "小菇", warehouse: "63-6" },
+            { id: "ITEM_46", category: "蕈類", itemCode: "", name: "杏鮑菇A［箱裝］", spec: "kg", process: "一般", speedPerMin: 7.84, materialName: "杏A", warehouse: "63-6" },
+            { id: "ITEM_47", category: "蕈類", itemCode: "A020C0102", name: "杏鮑菇C［箱裝］", spec: "600g/包", process: "一般", speedPerMin: 25, materialName: "杏C600g", warehouse: "63-6" },
+            { id: "ITEM_48", category: "蕈類", itemCode: "A020D0101", name: "杏鮑菇D", spec: "1kg/包", process: "一般", speedPerMin: 1, materialName: "杏D", warehouse: "63-6" },
+            { id: "ITEM_49", category: "蕈類", itemCode: "A090A0101", name: "秀珍菇A", spec: "1kg/包", process: "一般", speedPerMin: 1.93, materialName: "秀A", warehouse: "63-6" },
+            { id: "ITEM_50", category: "生菜", itemCode: "T05000101", name: "紅捲生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "紅捲生菜", warehouse: "63-6" },
+            { id: "ITEM_51", category: "生菜", itemCode: "T05000101", name: "紅捲生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "紅捲生菜", warehouse: "63-6" },
+            { id: "ITEM_52", category: "生菜", itemCode: "T06000101", name: "綠捲鬚生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "綠捲鬚生菜", warehouse: "63-6" },
+            { id: "ITEM_53", category: "生菜", itemCode: "T06000101", name: "綠捲鬚生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "綠捲鬚生菜", warehouse: "63-6" },
+            { id: "ITEM_54", category: "生菜", itemCode: "T07000101", name: "紅橡木生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "紅橡木生菜", warehouse: "63-6" },
+            { id: "ITEM_55", category: "生菜", itemCode: "T07000101", name: "紅橡木生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "紅橡木生菜", warehouse: "63-6" },
+            { id: "ITEM_56", category: "生菜", itemCode: "T08000101", name: "綠橡木生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "綠橡木生菜", warehouse: "63-6" },
+            { id: "ITEM_57", category: "生菜", itemCode: "T08000101", name: "綠橡木生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "綠橡木生菜", warehouse: "63-6" },
+            { id: "ITEM_58", category: "生菜", itemCode: "T09000101", name: "紅火焰生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "紅火焰生菜", warehouse: "63-6" },
+            { id: "ITEM_59", category: "生菜", itemCode: "T09000101", name: "紅火焰生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "紅火焰生菜", warehouse: "63-6" },
+            { id: "ITEM_60", category: "生菜", itemCode: "T10000101", name: "綠火焰生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "綠火焰生菜", warehouse: "63-6" },
+            { id: "ITEM_61", category: "生菜", itemCode: "T10000101", name: "綠火焰生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "綠火焰生菜", warehouse: "63-6" },
+            { id: "ITEM_62", category: "生菜", itemCode: "T11000101", name: "紅蘿蔓", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "紅蘿蔓", warehouse: "63-6" },
+            { id: "ITEM_63", category: "生菜", itemCode: "T11000101", name: "紅蘿蔓", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "紅蘿蔓", warehouse: "63-6" },
+            { id: "ITEM_64", category: "生菜", itemCode: "T12000101", name: "波士頓奶油生菜", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "波士頓奶油生菜", warehouse: "63-6" },
+            { id: "ITEM_65", category: "生菜", itemCode: "T12000101", name: "波士頓奶油生菜", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "波士頓奶油生菜", warehouse: "63-6" },
+            { id: "ITEM_66", category: "生菜", itemCode: "T13000101", name: "羽衣甘藍", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "羽衣甘藍", warehouse: "63-6" },
+            { id: "ITEM_67", category: "生菜", itemCode: "T13000101", name: "羽衣甘藍", spec: "300g/包", process: "生菜", speedPerMin: 1, materialName: "羽衣甘藍", warehouse: "63-6" },
+            { id: "ITEM_68", category: "生菜", itemCode: "T14000101", name: "歐芹［平葉巴西里］", spec: "1kg/包", process: "生菜", speedPerMin: 0.7, materialName: "歐芹［平葉巴西里］", warehouse: "63-6" },
+            { id: "ITEM_69", category: "生菜", itemCode: "T15000101", name: "紅包心生菜", spec: "600g/包", process: "生菜", speedPerMin: 0, materialName: "紅包心生菜", warehouse: "63-6" },
+            { id: "ITEM_70", category: "生菜", itemCode: "T18000101", name: "紅甜脆生菜［水耕］", spec: "1kg/包", process: "生菜", speedPerMin: 1, materialName: "紅甜脆生菜［水耕］", warehouse: "63-6" },
+            { id: "ITEM_71", category: "生菜", itemCode: "T18000101", name: "紅甜脆生菜［水耕］", spec: "300g/包", process: "生菜", speedPerMin: 0.7, materialName: "紅甜脆生菜［水耕］", warehouse: "63-6" },
+            { id: "ITEM_72", category: "生菜", itemCode: "T19000101", name: "綠甜脆生菜［水耕］", spec: "1kg/包", process: "生菜", speedPerMin: 1, materialName: "綠甜脆生菜［水耕］", warehouse: "63-6" },
+            { id: "ITEM_73", category: "生菜", itemCode: "T19000101", name: "綠甜脆生菜［水耕］", spec: "300g/包", process: "生菜", speedPerMin: 0.7, materialName: "綠甜脆生菜［水耕］", warehouse: "63-6" },
+            { id: "ITEM_74", category: "生菜", itemCode: "T20000101", name: "綠水晶生菜［水耕］", spec: "1kg/包", process: "生菜", speedPerMin: 1, materialName: "綠水晶生菜［水耕］", warehouse: "63-6" },
+            { id: "ITEM_75", category: "生菜", itemCode: "T20000101", name: "綠水晶生菜［水耕］", spec: "300g/包", process: "生菜", speedPerMin: 0.7, materialName: "綠水晶生菜［水耕］", warehouse: "63-6" }
+        ];
+
+        // System States
+        let backlogList = [];
+        let scheduledListA = []; // Area A tasks
+        let scheduledListB = []; // Area B tasks
+        let workersA = 2; // Area A Default Workers
+        let workersB = 1; // Area B Default Workers
+        let modalSelectedItems = new Set();
+        let modalCurrentCategory = "ALL"; // Category/Group Filter ID in modal
+
+        // DOM Elements
+        const backlogZone = document.getElementById('backlogZone');
+        const backlogPlaceholder = document.getElementById('backlogPlaceholder');
+        const backlogCount = document.getElementById('backlogCount');
+        const backlogSearch = document.getElementById('backlogSearch');
+        const quickGroupSelect = document.getElementById('quickGroupSelect');
+
+        // Area A DOM
+        const scheduledZoneA = document.getElementById('scheduledZoneA');
+        const tableContainerA = document.getElementById('tableContainerA');
+        const scheduleTableBodyA = document.getElementById('scheduleTableBodyA');
+        const placeholderA = document.getElementById('placeholderA');
+        const countA = document.getElementById('countA');
+        const subtotalA = document.getElementById('subtotalA');
+        const workersInputA = document.getElementById('workersInputA');
+
+        // Area B DOM
+        const scheduledZoneB = document.getElementById('scheduledZoneB');
+        const tableContainerB = document.getElementById('tableContainerB');
+        const scheduleTableBodyB = document.getElementById('scheduleTableBodyB');
+        const placeholderB = document.getElementById('placeholderB');
+        const countB = document.getElementById('countB');
+        const subtotalB = document.getElementById('subtotalB');
+        const workersInputB = document.getElementById('workersInputB');
+
+        // Global Summary DOM
+        const totalTimeDisplay = document.getElementById('totalTimeDisplay');
+        const summaryItemCount = document.getElementById('summaryItemCount');
+        const summaryTotalQty = document.getElementById('summaryTotalQty');
+        const summaryCountA = document.getElementById('summaryCountA');
+        const summaryCountB = document.getElementById('summaryCountB');
+
+        // Modals
+        const batchModalOverlay = document.getElementById('batchModalOverlay');
+        const btnOpenBatch = document.getElementById('btnOpenBatch');
+        const btnCloseBatch = document.getElementById('btnCloseBatch');
+        const btnCancelBatch = document.getElementById('btnCancelBatch');
+        const btnConfirmBatch = document.getElementById('btnConfirmBatch');
+        const modalSidebar = document.getElementById('modalSidebar');
+        const dbListBody = document.getElementById('dbListBody');
+        const modalSearchInput = document.getElementById('modalSearchInput');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const modalSelectedCounter = document.getElementById('modalSelectedCounter');
+
+        // Preview Modal Elements
+        const previewModalOverlay = document.getElementById('previewModalOverlay');
+        const btnOpenPreview = document.getElementById('btnOpenPreview');
+        const btnClosePreview = document.getElementById('btnClosePreview');
+        const btnCancelPreview = document.getElementById('btnCancelPreview');
+        const btnCopyPreviewText = document.getElementById('btnCopyPreviewText');
+        const btnPrintPreview = document.getElementById('btnPrintPreview');
+        const previewPrintArea = document.getElementById('previewPrintArea');
+
+        // Calculator Elements
+        const calcFab = document.getElementById('calcFab');
+        const calcPanel = document.getElementById('calcPanel');
+        const btnCloseCalc = document.getElementById('btnCloseCalc');
+        const calcItemSelect = document.getElementById('calcItemSelect');
+        const calcWorkersInput = document.getElementById('calcWorkersInput');
+        const calcSpeedIndicator = document.getElementById('calcSpeedIndicator');
+        const calcQtyInput = document.getElementById('calcQtyInput');
+        const calcSpecLabel = document.getElementById('calcSpecLabel');
+        const calcTimeResult = document.getElementById('calcTimeResult');
+        const calcTimeInput = document.getElementById('calcTimeInput');
+        const calcQtyResult = document.getElementById('calcQtyResult');
+        const calcUnitLabel = document.getElementById('calcUnitLabel');
+
+        // Update live time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = `📅 今日日期: ${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Helper: Extract human-readable unit from specification unit
+        function extractUnit(spec) {
+            if (!spec) return "件";
+            const specLower = spec.toLowerCase();
+            if (specLower === "kg" || spec === "台斤" || specLower === "g") {
+                return spec;
+            }
+            if (spec.includes("盒")) return "盒";
+            if (spec.includes("包")) return "包";
+            if (spec.includes("袋")) return "袋";
+            if (spec.includes("把")) return "把";
+            if (spec.includes("支")) return "支";
+            return "件";
+        }
+
+        // Initialize unique groups inside "⚡ 快速群組選入" Dropdown
+        function initGroupSelect() {
+            const groups = [...new Set(database.map(item => item.process).filter(p => p !== "一般" && p !== ""))];
+            groups.forEach(grp => {
+                const opt = document.createElement('option');
+                opt.value = grp;
+                opt.textContent = `${grp}群組`;
+                quickGroupSelect.appendChild(opt);
+            });
+            const opt = document.createElement('option');
+            opt.value = "一般";
+            opt.textContent = "一般品項群組";
+            quickGroupSelect.appendChild(opt);
+        }
+
+        // Initialize Categories and Groups inside Modal Sidebar
+        function initModalSidebar() {
+            modalSidebar.innerHTML = '';
+
+            const allBtn = document.createElement('button');
+            allBtn.className = 'category-filter-btn active';
+            allBtn.textContent = '全部群組 (ALL)';
+            allBtn.setAttribute('data-filter', 'ALL');
+            allBtn.addEventListener('click', () => selectFilter('ALL'));
+            modalSidebar.appendChild(allBtn);
+
+            const grpHeader = document.createElement('div');
+            grpHeader.style.cssText = 'font-size: 0.75rem; color: var(--text-light); font-weight: bold; margin: 0.8rem 0 0.3rem 0.5rem; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.2rem;';
+            grpHeader.textContent = '⚡ 群組篩選';
+            modalSidebar.appendChild(grpHeader);
+
+            const groups = [...new Set(database.map(item => item.process).filter(p => p !== "一般" && p !== ""))];
+            groups.forEach(grp => {
+                const btn = document.createElement('button');
+                btn.className = 'category-filter-btn';
+                btn.textContent = `⚡ ${grp}群組`;
+                btn.setAttribute('data-filter', `GRP_${grp}`);
+                btn.addEventListener('click', () => selectFilter(`GRP_${grp}`));
+                modalSidebar.appendChild(btn);
+            });
+
+            const genBtn = document.createElement('button');
+            genBtn.className = 'category-filter-btn';
+            genBtn.textContent = `⚡ 一般群組`;
+            genBtn.setAttribute('data-filter', `GRP_一般`);
+            genBtn.addEventListener('click', () => selectFilter(`GRP_一般`));
+            modalSidebar.appendChild(genBtn);
+        }
+
+        // Apply selected filter to modal view
+        function selectFilter(filterId) {
+            document.querySelectorAll('.category-filter-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.querySelector(`[data-filter="${filterId}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            modalCurrentCategory = filterId;
+            renderModalList();
+        }
+
+        // Reordering Logic: Move item Up inside a specific Area list
+        window.moveTaskUp = function (area, index) {
+            const list = area === 'A' ? scheduledListA : scheduledListB;
+            if (index > 0) {
+                const temp = list[index];
+                list[index] = list[index - 1];
+                list[index - 1] = temp;
+
+                if (area === 'A') {
+                    renderScheduledA();
+                } else {
+                    renderScheduledB();
+                }
+                updateGrandSummary();
+            }
+        };
+
+        // Reordering Logic: Move item Down inside a specific Area list
+        window.moveTaskDown = function (area, index) {
+            const list = area === 'A' ? scheduledListA : scheduledListB;
+            if (index < list.length - 1) {
+                const temp = list[index];
+                list[index] = list[index + 1];
+                list[index + 1] = temp;
+
+                if (area === 'A') {
+                    renderScheduledA();
+                } else {
+                    renderScheduledB();
+                }
+                updateGrandSummary();
+            }
+        };
+
+        // Calculation Helpers
+        function formatMinutesShort(minutes) {
+            const rounded = Math.round(minutes * 100) / 100;
+            return `${rounded} 分鐘`;
+        }
+
+        // Converts raw minutes to detailed XX Hours XX Minutes (Total XXX Mins)
+        function formatMinutesToHoursAndMinutes(minutes) {
+            const rounded = Math.round(minutes * 100) / 100;
+            if (rounded === 0) return "0 分鐘";
+            const hrs = Math.floor(rounded / 60);
+            const remainMins = Math.round(rounded % 60);
+            if (hrs === 0) {
+                return `${rounded} 分鐘`;
+            }
+            return `${hrs} 小時 ${remainMins} 分鐘 (共 ${rounded} 分)`;
+        }
+
+        // Hour & Minute formatting specifically for Grand summary and calculator results
+        function formatMinutesDetail(minutes) {
+            const roundedMins = Math.round(minutes * 100) / 100;
+            if (roundedMins < 60) {
+                return `${roundedMins} 分鐘`;
+            }
+            const hrs = Math.floor(roundedMins / 60);
+            const remainMins = Math.round((roundedMins % 60) * 100) / 100;
+            return `${roundedMins} 分鐘 (${hrs} 小時 ${remainMins > 0 ? remainMins + ' 分' : '整'})`;
+        }
+
+        // Helper: Move element inside array
+        function arrayMove(arr, fromIndex, toIndex) {
+            const element = arr[fromIndex];
+            arr.splice(fromIndex, 1);
+            arr.splice(toIndex, 0, element);
+        }
+
+        // Drag and Drop Logic
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev, id, source, index) {
+            ev.dataTransfer.setData("taskId", id);
+            ev.dataTransfer.setData("source", source);
+            if (index !== undefined) {
+                ev.dataTransfer.setData("draggedIndex", index);
+            }
+        }
+
+        // General drop handler for A rows
+        function dropOnRowA(ev, targetIndex) {
+            ev.preventDefault();
+            ev.stopPropagation(); // prevent triggering parent zone drop
+            scheduledZoneA.classList.remove('dragover');
+
+            const taskId = ev.dataTransfer.getData("taskId");
+            const source = ev.dataTransfer.getData("source");
+
+            if (source === 'scheduledA') {
+                const draggedIndex = parseInt(ev.dataTransfer.getData("draggedIndex"));
+                if (draggedIndex !== targetIndex && draggedIndex >= 0 && targetIndex >= 0) {
+                    arrayMove(scheduledListA, draggedIndex, targetIndex);
+                    renderScheduledA();
+                    updateGrandSummary();
+                }
+            } else if (source === 'backlog') {
+                const index = backlogList.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    const task = backlogList[index];
+                    backlogList.splice(index, 1);
+                    // Insert at target index
+                    scheduledListA.splice(targetIndex, 0, task);
+                    renderBacklog();
+                    renderScheduledA();
+                    updateGrandSummary();
+                }
+            } else if (source === 'scheduledB') {
+                const index = scheduledListB.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    const task = scheduledListB[index];
+                    scheduledListB.splice(index, 1);
+                    // Insert at target index
+                    scheduledListA.splice(targetIndex, 0, task);
+                    renderBacklog();
+                    renderScheduledA();
+                    renderScheduledB();
+                    updateGrandSummary();
+                }
+            }
+        }
+
+        // General drop handler for B rows
+        function dropOnRowB(ev, targetIndex) {
+            ev.preventDefault();
+            ev.stopPropagation(); // prevent triggering parent zone drop
+            scheduledZoneB.classList.remove('dragover');
+
+            const taskId = ev.dataTransfer.getData("taskId");
+            const source = ev.dataTransfer.getData("source");
+
+            if (source === 'scheduledB') {
+                const draggedIndex = parseInt(ev.dataTransfer.getData("draggedIndex"));
+                if (draggedIndex !== targetIndex && draggedIndex >= 0 && targetIndex >= 0) {
+                    arrayMove(scheduledListB, draggedIndex, targetIndex);
+                    renderScheduledB();
+                    updateGrandSummary();
+                }
+            } else if (source === 'backlog') {
+                const index = backlogList.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    const task = backlogList[index];
+                    backlogList.splice(index, 1);
+                    // Insert at target index
+                    scheduledListB.splice(targetIndex, 0, task);
+                    renderBacklog();
+                    renderScheduledB();
+                    updateGrandSummary();
+                }
+            } else if (source === 'scheduledA') {
+                const index = scheduledListA.findIndex(t => t.id === taskId);
+                if (index !== -1) {
+                    const task = scheduledListA[index];
+                    scheduledListA.splice(index, 1);
+                    // Insert at target index
+                    scheduledListB.splice(targetIndex, 0, task);
+                    renderBacklog();
+                    renderScheduledA();
+                    renderScheduledB();
+                    updateGrandSummary();
+                }
+            }
+        }
+
+        // Adding visual dragover cues
+        backlogZone.addEventListener('dragenter', () => backlogZone.classList.add('dragover'));
+        backlogZone.addEventListener('dragleave', () => backlogZone.classList.remove('dragover'));
+        backlogZone.addEventListener('dragend', () => backlogZone.classList.remove('dragover'));
+
+        scheduledZoneA.addEventListener('dragenter', () => scheduledZoneA.classList.add('dragover'));
+        scheduledZoneA.addEventListener('dragleave', () => scheduledZoneA.classList.remove('dragover'));
+        scheduledZoneA.addEventListener('dragend', () => scheduledZoneA.classList.remove('dragover'));
+
+        scheduledZoneB.addEventListener('dragenter', () => scheduledZoneB.classList.add('dragover'));
+        scheduledZoneB.addEventListener('dragleave', () => scheduledZoneB.classList.remove('dragover'));
+        scheduledZoneB.addEventListener('dragend', () => scheduledZoneB.classList.remove('dragover'));
+
+        // Drop target triggers
+        function dropToScheduledA(ev) {
+            ev.preventDefault();
+            scheduledZoneA.classList.remove('dragover');
+            const taskId = ev.dataTransfer.getData("taskId");
+            const source = ev.dataTransfer.getData("source");
+            moveToAreaA(taskId, source);
+        }
+
+        function dropToScheduledB(ev) {
+            ev.preventDefault();
+            scheduledZoneB.classList.remove('dragover');
+            const taskId = ev.dataTransfer.getData("taskId");
+            const source = ev.dataTransfer.getData("source");
+            moveToAreaB(taskId, source);
+        }
+
+        function dropToBacklog(ev) {
+            ev.preventDefault();
+            backlogZone.classList.remove('dragover');
+            const taskId = ev.dataTransfer.getData("taskId");
+            const source = ev.dataTransfer.getData("source");
+
+            if (source === "scheduledA") {
+                moveToBacklogFromA(taskId);
+            } else if (source === "scheduledB") {
+                moveToBacklogFromB(taskId);
+            }
+        }
+
+        // Move Item to Area A
+        function moveToAreaA(id, source = 'backlog') {
+            if (source === 'backlog') {
+                const index = backlogList.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    const task = backlogList[index];
+                    backlogList.splice(index, 1);
+                    scheduledListA.push(task);
+                }
+            } else if (source === 'scheduledB') {
+                const index = scheduledListB.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    const task = scheduledListB[index];
+                    scheduledListB.splice(index, 1);
+                    scheduledListA.push(task);
+                }
+            }
+            renderBacklog();
+            renderScheduledA();
+            renderScheduledB();
+            updateGrandSummary();
+        }
+
+        // Move Item to Area B
+        function moveToAreaB(id, source = 'backlog') {
+            if (source === 'backlog') {
+                const index = backlogList.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    const task = backlogList[index];
+                    backlogList.splice(index, 1);
+                    scheduledListB.push(task);
+                }
+            } else if (source === 'scheduledA') {
+                const index = scheduledListA.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    const task = scheduledListA[index];
+                    scheduledListA.splice(index, 1);
+                    scheduledListB.push(task);
+                }
+            }
+            renderBacklog();
+            renderScheduledA();
+            renderScheduledB();
+            updateGrandSummary();
+        }
+
+        // Move Item from A back to Backlog Pool
+        window.moveToBacklogFromA = function (id) {
+            const index = scheduledListA.findIndex(t => t.id === id);
+            if (index !== -1) {
+                const task = scheduledListA[index];
+                task.quantity = 0;
+                scheduledListA.splice(index, 1);
+                backlogList.push(task);
+
+                renderBacklog();
+                renderScheduledA();
+                updateGrandSummary();
+            }
+        };
+
+        // Move Item from B back to Backlog Pool
+        window.moveToBacklogFromB = function (id) {
+            const index = scheduledListB.findIndex(t => t.id === id);
+            if (index !== -1) {
+                const task = scheduledListB[index];
+                task.quantity = 0;
+                scheduledListB.splice(index, 1);
+                backlogList.push(task);
+
+                renderBacklog();
+                renderScheduledB();
+                updateGrandSummary();
+            }
+        };
+
+        // Remove entirely
+        window.removeBacklogItem = function (id) {
+            backlogList = backlogList.filter(t => t.id !== id);
+            renderBacklog();
+        };
+
+        window.removeScheduledItemA = function (id) {
+            scheduledListA = scheduledListA.filter(t => t.id !== id);
+            renderScheduledA();
+            updateGrandSummary();
+        };
+
+        window.removeScheduledItemB = function (id) {
+            scheduledListB = scheduledListB.filter(t => t.id !== id);
+            renderScheduledB();
+            updateGrandSummary();
+        };
+
+        // Render Backlog Card List
+        function renderBacklog() {
+            const query = backlogSearch.value.trim().toLowerCase();
+            const cards = backlogZone.querySelectorAll('.task-card');
+            cards.forEach(c => c.remove());
+
+            let visibleCount = 0;
+
+            backlogList.forEach(task => {
+                if (query && !task.item.name.toLowerCase().includes(query) && !task.item.spec.toLowerCase().includes(query)) {
+                    return;
+                }
+
+                visibleCount++;
+                const card = document.createElement('div');
+                card.className = 'task-card';
+                card.draggable = true;
+                card.addEventListener('dragstart', (e) => drag(e, task.id, 'backlog'));
+
+                card.innerHTML = `
+                    <div class="card-header" style="margin-bottom: 0.25rem;">
+                        <span class="category-tag tag-${task.item.category}" style="font-size: 0.65rem; padding: 0.1rem 0.4rem;">${task.item.category} • ${task.item.process}</span>
+                        <button class="icon-btn icon-btn-danger" onclick="removeBacklogItem('${task.id}')" title="移除品項" style="font-size: 0.75rem; width: 16px; height: 16px;">✕</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.4rem;">
+                        <div style="flex-grow: 1; min-width: 0;">
+                            <div class="card-title" style="margin: 0 0 0.15rem 0; font-size: 0.82rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: normal;">${task.item.name}</div>
+                            <div class="card-info" style="display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.7rem; color: var(--text-light);">
+                                <span>規格: ${task.item.spec}</span>
+                                <span>產速: ${task.item.speedPerMin}/分人</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem; flex-shrink: 0;">
+                            <button class="btn-action" onclick="moveToAreaA('${task.id}')" style="font-size: 0.68rem; padding: 0; background: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.2); width: 44px; height: 22px; line-height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px;">
+                                排 A
+                            </button>
+                            <button class="btn-action" onclick="moveToAreaB('${task.id}')" style="font-size: 0.68rem; padding: 0; background: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); width: 44px; height: 22px; line-height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px;">
+                                排 B
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                backlogZone.appendChild(card);
+            });
+
+            backlogCount.textContent = `(共 ${backlogList.length} 項)`;
+
+            if (visibleCount === 0) {
+                backlogPlaceholder.style.display = 'flex';
+            } else {
+                backlogPlaceholder.style.display = 'none';
+            }
+        }
+
+        // Render Scheduled Area A (Includes ▲/▼ buttons!)
+        function renderScheduledA() {
+            scheduleTableBodyA.innerHTML = '';
+
+            scheduledListA.forEach((task, index) => {
+                const tr = document.createElement('tr');
+                tr.draggable = true;
+                tr.addEventListener('dragstart', (e) => drag(e, task.id, 'scheduledA', index));
+
+                tr.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    tr.classList.add('dragover-row');
+                });
+                tr.addEventListener('dragleave', () => {
+                    tr.classList.remove('dragover-row');
+                });
+                tr.addEventListener('drop', (e) => {
+                    tr.classList.remove('dragover-row');
+                    dropOnRowA(e, index);
+                });
+
+                const minutes = task.quantity > 0 ? (task.quantity / task.item.speedPerMin / workersA) : 0;
+
+                tr.innerHTML = `
+                    <td style="font-weight: 500;">${task.item.name}</td>
+                    <td style="color: var(--text-light);">${task.item.spec}</td>
+                    <td style="text-align: center;">
+                        <input type="number" class="qty-input qty-input-table" value="${task.quantity || ''}" placeholder="輸入數量" min="1" style="width: 75px;" data-task-id="${task.id}">
+                    </td>
+                    <td style="text-align: right;"><span class="time-badge">${formatMinutesShort(minutes)}</span></td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center;">
+                            <button class="icon-btn" onclick="moveTaskUp('A', ${index})" title="上移" ${index === 0 ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>▲</button>
+                            <button class="icon-btn" onclick="moveTaskDown('A', ${index})" title="下移" ${index === scheduledListA.length - 1 ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>▼</button>
+                            <button class="icon-btn" onclick="moveToBacklogFromA('${task.id}')" title="移回待派池" style="transform: rotate(180deg)">➔</button>
+                            <button class="icon-btn icon-btn-danger" onclick="removeScheduledItemA('${task.id}')" title="刪除">✕</button>
+                        </div>
+                    </td>
+                `;
+                scheduleTableBodyA.appendChild(tr);
+            });
+
+            // Focus-preserving input listener for A
+            const qInputs = scheduleTableBodyA.querySelectorAll('.qty-input-table');
+            qInputs.forEach(input => {
+                input.addEventListener('focus', (e) => e.target.select());
+
+                input.addEventListener('input', (e) => {
+                    const taskId = e.target.getAttribute('data-task-id');
+                    const qtyVal = parseInt(e.target.value) || 0;
+                    const task = scheduledListA.find(t => t.id === taskId);
+                    if (task) {
+                        task.quantity = qtyVal;
+                        const tr = e.target.closest('tr');
+                        const timeBadge = tr.querySelector('.time-badge');
+                        const minutes = task.quantity > 0 ? (task.quantity / task.item.speedPerMin / workersA) : 0;
+                        timeBadge.textContent = formatMinutesShort(minutes);
+                        updateGrandSummary();
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const allInputs = Array.from(scheduleTableBodyA.querySelectorAll('.qty-input-table'));
+                        const currIdx = allInputs.indexOf(e.target);
+                        if (currIdx !== -1 && currIdx + 1 < allInputs.length) {
+                            allInputs[currIdx + 1].focus();
+                            allInputs[currIdx + 1].select();
+                        }
+                    }
+                });
+            });
+
+            countA.textContent = `(共 ${scheduledListA.length} 項)`;
+
+            if (scheduledListA.length === 0) {
+                tableContainerA.style.display = 'none';
+                placeholderA.style.display = 'flex';
+            } else {
+                tableContainerA.style.display = 'block';
+                placeholderA.style.display = 'none';
+            }
+        }
+
+        // Render Scheduled Area B (Includes ▲/▼ buttons!)
+        function renderScheduledB() {
+            scheduleTableBodyB.innerHTML = '';
+
+            scheduledListB.forEach((task, index) => {
+                const tr = document.createElement('tr');
+                tr.draggable = true;
+                tr.addEventListener('dragstart', (e) => drag(e, task.id, 'scheduledB', index));
+
+                tr.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    tr.classList.add('dragover-row');
+                });
+                tr.addEventListener('dragleave', () => {
+                    tr.classList.remove('dragover-row');
+                });
+                tr.addEventListener('drop', (e) => {
+                    tr.classList.remove('dragover-row');
+                    dropOnRowB(e, index);
+                });
+
+                const minutes = task.quantity > 0 ? (task.quantity / task.item.speedPerMin / workersB) : 0;
+
+                tr.innerHTML = `
+                    <td style="font-weight: 500;">${task.item.name}</td>
+                    <td style="color: var(--text-light);">${task.item.spec}</td>
+                    <td style="text-align: center;">
+                        <input type="number" class="qty-input qty-input-table" value="${task.quantity || ''}" placeholder="輸入數量" min="1" style="width: 75px;" data-task-id="${task.id}">
+                    </td>
+                    <td style="text-align: right;"><span class="time-badge">${formatMinutesShort(minutes)}</span></td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center;">
+                            <button class="icon-btn" onclick="moveTaskUp('B', ${index})" title="上移" ${index === 0 ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>▲</button>
+                            <button class="icon-btn" onclick="moveTaskDown('B', ${index})" title="下移" ${index === scheduledListB.length - 1 ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>▼</button>
+                            <button class="icon-btn" onclick="moveToBacklogFromB('${task.id}')" title="移回待派池" style="transform: rotate(180deg)">➔</button>
+                            <button class="icon-btn icon-btn-danger" onclick="removeScheduledItemB('${task.id}')" title="刪除">✕</button>
+                        </div>
+                    </td>
+                `;
+                scheduleTableBodyB.appendChild(tr);
+            });
+
+            // Focus-preserving input listener for B
+            const qInputs = scheduleTableBodyB.querySelectorAll('.qty-input-table');
+            qInputs.forEach(input => {
+                input.addEventListener('focus', (e) => e.target.select());
+
+                input.addEventListener('input', (e) => {
+                    const taskId = e.target.getAttribute('data-task-id');
+                    const qtyVal = parseInt(e.target.value) || 0;
+                    const task = scheduledListB.find(t => t.id === taskId);
+                    if (task) {
+                        task.quantity = qtyVal;
+                        const tr = e.target.closest('tr');
+                        const timeBadge = tr.querySelector('.time-badge');
+                        const minutes = task.quantity > 0 ? (task.quantity / task.item.speedPerMin / workersB) : 0;
+                        timeBadge.textContent = formatMinutesShort(minutes);
+                        updateGrandSummary();
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const allInputs = Array.from(scheduleTableBodyB.querySelectorAll('.qty-input-table'));
+                        const currIdx = allInputs.indexOf(e.target);
+                        if (currIdx !== -1 && currIdx + 1 < allInputs.length) {
+                            allInputs[currIdx + 1].focus();
+                            allInputs[currIdx + 1].select();
+                        }
+                    }
+                });
+            });
+
+            countB.textContent = `(共 ${scheduledListB.length} 項)`;
+
+            if (scheduledListB.length === 0) {
+                tableContainerB.style.display = 'none';
+                placeholderB.style.display = 'flex';
+            } else {
+                tableContainerB.style.display = 'block';
+                placeholderB.style.display = 'none';
+            }
+        }
+
+        // Update Bottom Grand Totals, Subtotals, and CAPACITY METERS
+        function updateGrandSummary() {
+            // Area A Calculations
+            let totalMinsA = 0;
+            let totalQtyA = 0;
+            scheduledListA.forEach(task => {
+                if (task.quantity > 0) {
+                    totalMinsA += (task.quantity / task.item.speedPerMin / workersA);
+                    totalQtyA += task.quantity;
+                }
+            });
+            subtotalA.textContent = `小計: ${formatMinutesToHoursAndMinutes(totalMinsA)}`;
+
+            // Capacity details for A (1 worker = 8 hours = 480 mins)
+            const capacityMinsA = workersA * 8 * 60;
+            const capacityHoursA = workersA * 8;
+            const occupancyPctA = capacityMinsA > 0 ? (totalMinsA / capacityMinsA) * 100 : 0;
+            const remainingMinsA = capacityMinsA - totalMinsA;
+
+            const capacityTextA = document.querySelector('#capacityTextA');
+            const occupancyPctTextA = document.querySelector('#occupancyPctTextA');
+            const progressBarFillA = document.querySelector('#progressBarFillA');
+            const scheduledTimeTextA = document.querySelector('#scheduledTimeTextA');
+            const remainingTimeTextA = document.querySelector('#remainingTimeTextA');
+
+            if (capacityTextA) capacityTextA.textContent = `${capacityHoursA} 小時 (${capacityMinsA} 分)`;
+            if (occupancyPctTextA) {
+                occupancyPctTextA.textContent = `${Math.round(occupancyPctA * 10) / 10}%`;
+                if (occupancyPctA <= 80) {
+                    occupancyPctTextA.style.color = '#10b981';
+                } else if (occupancyPctA <= 100) {
+                    occupancyPctTextA.style.color = '#eab308';
+                } else {
+                    occupancyPctTextA.style.color = '#ef4444';
+                }
+            }
+            if (progressBarFillA) {
+                const displayPct = Math.min(occupancyPctA, 100);
+                progressBarFillA.style.width = `${displayPct}%`;
+                if (occupancyPctA <= 80) {
+                    progressBarFillA.style.background = 'linear-gradient(to right, #10b981, #34d399)';
+                } else if (occupancyPctA <= 100) {
+                    progressBarFillA.style.background = 'linear-gradient(to right, #eab308, #fbbf24)';
+                } else {
+                    progressBarFillA.style.background = 'linear-gradient(to right, #ef4444, #f87171)';
+                }
+            }
+            if (scheduledTimeTextA) scheduledTimeTextA.textContent = `${Math.round(totalMinsA * 10) / 10} 分`;
+            if (remainingTimeTextA) {
+                if (remainingMinsA >= 0) {
+                    remainingTimeTextA.textContent = `${Math.round(remainingMinsA * 10) / 10} 分`;
+                    remainingTimeTextA.style.color = '#34d399';
+                } else {
+                    remainingTimeTextA.textContent = `超載 ${Math.round(Math.abs(remainingMinsA) * 10) / 10} 分`;
+                    remainingTimeTextA.style.color = '#f87171';
+                }
+            }
+
+            // Area B Calculations
+            let totalMinsB = 0;
+            let totalQtyB = 0;
+            scheduledListB.forEach(task => {
+                if (task.quantity > 0) {
+                    totalMinsB += (task.quantity / task.item.speedPerMin / workersB);
+                    totalQtyB += task.quantity;
+                }
+            });
+            subtotalB.textContent = `小計: ${formatMinutesToHoursAndMinutes(totalMinsB)}`;
+
+            // Capacity details for B
+            const capacityMinsB = workersB * 8 * 60;
+            const capacityHoursB = workersB * 8;
+            const occupancyPctB = capacityMinsB > 0 ? (totalMinsB / capacityMinsB) * 100 : 0;
+            const remainingMinsB = capacityMinsB - totalMinsB;
+
+            const capacityTextB = document.querySelector('#capacityTextB');
+            const occupancyPctTextB = document.querySelector('#occupancyPctTextB');
+            const progressBarFillB = document.querySelector('#progressBarFillB');
+            const scheduledTimeTextB = document.querySelector('#scheduledTimeTextB');
+            const remainingTimeTextB = document.querySelector('#remainingTimeTextB');
+
+            if (capacityTextB) capacityTextB.textContent = `${capacityHoursB} 小時 (${capacityMinsB} 分)`;
+            if (occupancyPctTextB) {
+                occupancyPctTextB.textContent = `${Math.round(occupancyPctB * 10) / 10}%`;
+                if (occupancyPctB <= 80) {
+                    occupancyPctTextB.style.color = '#10b981';
+                } else if (occupancyPctB <= 100) {
+                    occupancyPctTextB.style.color = '#eab308';
+                } else {
+                    occupancyPctTextB.style.color = '#ef4444';
+                }
+            }
+            if (progressBarFillB) {
+                const displayPct = Math.min(occupancyPctB, 100);
+                progressBarFillB.style.width = `${displayPct}%`;
+                if (occupancyPctB <= 80) {
+                    progressBarFillB.style.background = 'linear-gradient(to right, #10b981, #34d399)';
+                } else if (occupancyPctB <= 100) {
+                    progressBarFillB.style.background = 'linear-gradient(to right, #eab308, #fbbf24)';
+                } else {
+                    progressBarFillB.style.background = 'linear-gradient(to right, #ef4444, #f87171)';
+                }
+            }
+            if (scheduledTimeTextB) scheduledTimeTextB.textContent = `${Math.round(totalMinsB * 10) / 10} 分`;
+            if (remainingTimeTextB) {
+                if (remainingMinsB >= 0) {
+                    remainingTimeTextB.textContent = `${Math.round(remainingMinsB * 10) / 10} 分`;
+                    remainingTimeTextB.style.color = '#34d399';
+                } else {
+                    remainingTimeTextB.textContent = `超載 ${Math.round(Math.abs(remainingMinsB) * 10) / 10} 分`;
+                    remainingTimeTextB.style.color = '#f87171';
+                }
+            }
+
+            // Grand Calculations
+            const grandTotalMins = totalMinsA + totalMinsB;
+            const grandTotalQty = totalQtyA + totalQtyB;
+            const grandTotalItems = scheduledListA.length + scheduledListB.length;
+
+            totalTimeDisplay.innerHTML = formatMinutesDetail(grandTotalMins);
+            summaryItemCount.textContent = grandTotalItems;
+            summaryTotalQty.textContent = grandTotalQty;
+            summaryCountA.textContent = scheduledListA.length;
+            summaryCountB.textContent = scheduledListB.length;
+        }
+
+        // Area A/B Workers Input Handlers
+        workersInputA.addEventListener('input', (e) => {
+            workersA = parseInt(e.target.value) || 1;
+            renderScheduledA();
+            updateGrandSummary();
+        });
+
+        workersInputB.addEventListener('input', (e) => {
+            workersB = parseInt(e.target.value) || 1;
+            renderScheduledB();
+            updateGrandSummary();
+        });
+
+        // Backlog search box interaction
+        backlogSearch.addEventListener('input', renderBacklog);
+
+        // ========================================================
+        // ⚡ QUICK SELECT GROUP LOGIC
+        // ========================================================
+        quickGroupSelect.addEventListener('change', () => {
+            const grp = quickGroupSelect.value;
+            if (!grp) return;
+
+            modalSelectedItems.clear();
+            selectFilter(`GRP_${grp}`);
+
+            const filtered = database.filter(item => {
+                return (grp === "一般")
+                    ? (item.process === "一般" || item.process === "")
+                    : (item.process === grp);
+            });
+            filtered.forEach(item => modalSelectedItems.add(item.id));
+
+            renderModalList();
+            updateModalCounter();
+            batchModalOverlay.classList.add('active');
+            quickGroupSelect.value = '';
+        });
+
+
+        // ========================================================
+        // 📦 BATCH SELECTION MODAL LOGIC
+        // ========================================================
+
+        btnOpenBatch.addEventListener('click', () => {
+            modalSelectedItems.clear();
+            selectAllCheckbox.checked = false;
+            modalSearchInput.value = '';
+            selectFilter('ALL');
+            batchModalOverlay.classList.add('active');
+        });
+
+        const closeModal = () => {
+            batchModalOverlay.classList.remove('active');
+        };
+
+        btnCloseBatch.addEventListener('click', closeModal);
+        btnCancelBatch.addEventListener('click', closeModal);
+
+        function renderModalList() {
+            dbListBody.innerHTML = '';
+            const query = modalSearchInput.value.trim().toLowerCase();
+
+            const filtered = database.filter(item => {
+                if (query && !item.name.toLowerCase().includes(query) && !item.spec.toLowerCase().includes(query) && !item.itemCode.toLowerCase().includes(query)) return false;
+                if (modalCurrentCategory === 'ALL') return true;
+                if (modalCurrentCategory.startsWith('CAT_')) {
+                    const cat = modalCurrentCategory.substring(4);
+                    return item.category === cat;
+                }
+                if (modalCurrentCategory.startsWith('GRP_')) {
+                    const grp = modalCurrentCategory.substring(4);
+                    return (grp === "一般")
+                        ? (item.process === "一般" || item.process === "")
+                        : (item.process === grp);
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                dbListBody.innerHTML = `<div style="text-align: center; color: var(--text-light); padding: 2rem; font-size: 0.9rem;">沒有符合條件的品項</div>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'db-item-row';
+
+                const isChecked = modalSelectedItems.has(item.id);
+
+                row.innerHTML = `
+                    <input type="checkbox" class="db-item-checkbox" ${isChecked ? 'checked' : ''}>
+                    <div class="db-item-details">
+                        <span class="name">${item.name}</span>
+                        <span class="spec">${item.spec}</span>
+                        <span class="speed">${item.speedPerMin} ${extractUnit(item.spec)}/分人</span>
+                    </div>
+                `;
+
+                const checkbox = row.querySelector('.db-item-checkbox');
+                const toggleCheck = (e) => {
+                    e.stopPropagation();
+                    if (checkbox.checked) {
+                        modalSelectedItems.add(item.id);
+                    } else {
+                        modalSelectedItems.delete(item.id);
+                    }
+                    updateModalCounter();
+                };
+
+                checkbox.addEventListener('change', toggleCheck);
+                row.addEventListener('click', () => {
+                    checkbox.checked = !checkbox.checked;
+                    if (checkbox.checked) {
+                        modalSelectedItems.add(item.id);
+                    } else {
+                        modalSelectedItems.delete(item.id);
+                    }
+                    updateModalCounter();
+                });
+
+                dbListBody.appendChild(row);
+            });
+
+            const allChecked = filtered.every(item => modalSelectedItems.has(item.id));
+            selectAllCheckbox.checked = allChecked && filtered.length > 0;
+        }
+
+        modalSearchInput.addEventListener('input', renderModalList);
+
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const query = modalSearchInput.value.trim().toLowerCase();
+            const filtered = database.filter(item => {
+                if (modalCurrentCategory === 'ALL') return true;
+                if (modalCurrentCategory.startsWith('CAT_')) {
+                    const cat = modalCurrentCategory.substring(4);
+                    return item.category === cat;
+                }
+                if (modalCurrentCategory.startsWith('GRP_')) {
+                    const grp = modalCurrentCategory.substring(4);
+                    return (grp === "一般") ? (item.process === "一般" || item.process === "") : (item.process === grp);
+                }
+                return true;
+            });
+
+            if (e.target.checked) {
+                filtered.forEach(item => modalSelectedItems.add(item.id));
+            } else {
+                filtered.forEach(item => modalSelectedItems.delete(item.id));
+            }
+
+            renderModalList();
+            updateModalCounter();
+        });
+
+        function updateModalCounter() {
+            modalSelectedCounter.textContent = `已選擇 ${modalSelectedItems.size} 個項目`;
+        }
+
+        btnConfirmBatch.addEventListener('click', () => {
+            if (modalSelectedItems.size === 0) {
+                alert('請先勾選品項！');
+                return;
+            }
+
+            let addedCount = 0;
+            modalSelectedItems.forEach(itemId => {
+                const dbItem = database.find(item => item.id === itemId);
+                const existsInBacklog = backlogList.some(t => t.item.id === itemId);
+                const existsInScheduledA = scheduledListA.some(t => t.item.id === itemId);
+                const existsInScheduledB = scheduledListB.some(t => t.item.id === itemId);
+
+                if (!existsInBacklog && !existsInScheduledA && !existsInScheduledB && dbItem) {
+                    backlogList.push({
+                        id: `${dbItem.id}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                        item: dbItem,
+                        quantity: 0,
+                        workers: 1
+                    });
+                    addedCount++;
+                }
+            });
+
+            renderBacklog();
+            closeModal();
+
+            if (addedCount > 0) {
+                backlogSearch.focus();
+            }
+        });
+
+        // ========================================================
+        // 👁️ PREVIEW DISPATCH SHEET MODAL (PRODUCT + QTY ONLY)
+        // ========================================================
+
+        function generatePreviewHTML() {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+
+            let html = `<div style="text-align: center; font-weight: bold; font-size: 1.25rem; margin-bottom: 1.5rem; border-bottom: 2px dashed #94a3b8; padding-bottom: 0.5rem; color: #0f172a;">📋 手工線派工單 (${dateStr})</div>`;
+
+            const buildTable = (list, title, titleColor, borderColor, workers) => {
+                let tableHtml = `<div style="margin-bottom: 1.5rem;">`;
+                tableHtml += `<div style="font-weight: 700; color: ${titleColor}; border-bottom: 2px solid ${borderColor}; padding-bottom: 0.25rem; margin-bottom: 0.6rem; font-size: 1.05rem;">${title} (配置: ${workers} 人)</div>`;
+                
+                if (list.length === 0) {
+                    tableHtml += `<div style="color: #64748b; font-style: italic; padding: 0.5rem;">無排程項目</div>`;
+                } else {
+                    tableHtml += `<table style="width: 100%; border-collapse: collapse; margin-top: 0.4rem; font-size: 0.9rem; border: 1px solid #cbd5e1;">`;
+                    tableHtml += `<thead>`;
+                    tableHtml += `<tr style="background-color: #f8fafc;">`;
+                    tableHtml += `<th style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; color: #1e293b;">品項</th>`;
+                    tableHtml += `<th style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: right; font-weight: 700; color: #1e293b; width: 80px;">數量</th>`;
+                    tableHtml += `<th style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; color: #1e293b; width: 90px;">規格單位</th>`;
+                    tableHtml += `<th style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: left; font-weight: 700; color: #1e293b; width: 110px;">原料編號</th>`;
+                    tableHtml += `<th style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; color: #1e293b; width: 70px;">倉別</th>`;
+                    tableHtml += `</tr>`;
+                    tableHtml += `</thead>`;
+                    tableHtml += `<tbody>`;
+                    
+                    list.forEach(task => {
+                        const qtyVal = task.quantity > 0 ? task.quantity : "0";
+                        const itemCodeDisplay = task.item.itemCode || "-";
+                        const materialDisplay = task.item.materialName || "-";
+                        const wh = task.item.warehouse || "-";
+                        
+                        tableHtml += `<tr style="border-bottom: 1px solid #cbd5e1;">`;
+                        tableHtml += `<td style="padding: 0.55rem; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 600;">${task.item.name}</td>`;
+                        tableHtml += `<td style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: right; color: #059669; font-weight: 700; font-size: 0.95rem;">${qtyVal}</td>`;
+                        tableHtml += `<td style="padding: 0.55rem; border: 1px solid #cbd5e1; color: #475569;">${task.item.spec}</td>`;
+                        tableHtml += `<td style="padding: 0.55rem; border: 1px solid #cbd5e1; color: #475569; font-family: monospace; font-size: 0.85rem;">${itemCodeDisplay} <br> <span style="font-size:0.75rem; color:#64748b;">${materialDisplay}</span></td>`;
+                        tableHtml += `<td style="padding: 0.55rem; border: 1px solid #cbd5e1; text-align: center; color: #1e293b; font-weight: bold;">${wh}</td>`;
+                        tableHtml += `</tr>`;
+                    });
+                    
+                    tableHtml += `</tbody>`;
+                    tableHtml += `</table>`;
+                }
+                
+                tableHtml += `</div>`;
+                return tableHtml;
+            };
+
+            // Area A Table
+            html += buildTable(scheduledListA, "🔴 A 區排程", "#e11d48", "#fda4af", workersInputA.value);
+
+            // Area B Table
+            html += buildTable(scheduledListB, "🔵 B 區排程", "#2563eb", "#93c5fd", workersInputB.value);
+
+            return html;
+        }
+
+        function generatePreviewText() {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+
+            let text = `【手工線派工單 - ${dateStr}】\n\n`;
+
+            text += `🔴 A 區排程 (配置: ${workersInputA.value} 人)\n`;
+            text += `品項 | 數量 | 規格單位 | 原料編號 | 倉別\n`;
+            text += `--------------------------------------------------\n`;
+            if (scheduledListA.length === 0) {
+                text += `  無排程項目\n`;
+            } else {
+                scheduledListA.forEach(task => {
+                    const qtyVal = task.quantity > 0 ? task.quantity : "0";
+                    const itemCodeDisplay = task.item.itemCode || "-";
+                    const materialDisplay = task.item.materialName || "-";
+                    const wh = task.item.warehouse || "-";
+                    text += `${task.item.name} | ${qtyVal} | ${task.item.spec} | ${itemCodeDisplay} (${materialDisplay}) | ${wh}\n`;
+                });
+            }
+
+            text += `\n🔵 B 區排程 (配置: ${workersInputB.value} 人)\n`;
+            text += `品項 | 數量 | 規格單位 | 原料編號 | 倉別\n`;
+            text += `--------------------------------------------------\n`;
+            if (scheduledListB.length === 0) {
+                text += `  無排程項目\n`;
+            } else {
+                scheduledListB.forEach(task => {
+                    const qtyVal = task.quantity > 0 ? task.quantity : "0";
+                    const itemCodeDisplay = task.item.itemCode || "-";
+                    const materialDisplay = task.item.materialName || "-";
+                    const wh = task.item.warehouse || "-";
+                    text += `${task.item.name} | ${qtyVal} | ${task.item.spec} | ${itemCodeDisplay} (${materialDisplay}) | ${wh}\n`;
+                });
+            }
+
+            return text;
+        }
+
+        btnOpenPreview.addEventListener('click', () => {
+            if (scheduledListA.length === 0 && scheduledListB.length === 0) {
+                alert('今日排程區目前無品項，請先選入並指派數量！');
+                return;
+            }
+            previewPrintArea.innerHTML = generatePreviewHTML();
+            previewModalOverlay.classList.add('active');
+        });
+
+        const closePreviewModal = () => {
+            previewModalOverlay.classList.remove('active');
+        };
+
+        btnClosePreview.addEventListener('click', closePreviewModal);
+        btnCancelPreview.addEventListener('click', closePreviewModal);
+
+        // Copy plain text to clipboard for Line
+        btnCopyPreviewText.addEventListener('click', () => {
+            const txt = generatePreviewText();
+            navigator.clipboard.writeText(txt).then(() => {
+                alert('📋 派工文字複製成功！可以直接貼到 Line 工作群組中！');
+            }).catch(err => {
+                alert('複製失敗，請手動複製文字內容。');
+            });
+        });
+
+        // Trigger browser print for preview sheet specifically
+        btnPrintPreview.addEventListener('click', () => {
+            window.print();
+        });
+
+        // ========================================================
+        // 🧮 FLOATING CALCULATOR PANEL LOGIC (FUZZY SEARCH ADDED)
+        // ========================================================
+
+        calcFab.addEventListener('click', () => {
+            calcPanel.classList.toggle('active');
+            if (calcPanel.classList.contains('active')) {
+                document.getElementById('calcSearchInput').focus();
+            }
+        });
+
+        btnCloseCalc.addEventListener('click', () => {
+            calcPanel.classList.remove('active');
+        });
+
+        calcItemSelect.addEventListener('change', () => {
+            updateCalculatorSpeed();
+            calculateModeA();
+            calculateModeB();
+        });
+
+        calcWorkersInput.addEventListener('input', () => {
+            calculateModeA();
+            calculateModeB();
+        });
+
+        function populateCalcSelect(list) {
+            calcItemSelect.innerHTML = '';
+            if (list.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "--無相符搜尋項目--";
+                calcItemSelect.appendChild(opt);
+                return;
+            }
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `${item.name} (${item.spec})`;
+                calcItemSelect.appendChild(opt);
+            });
+        }
+
+        // Fuzzy search for calculator select dropdown
+        const calcSearchInput = document.getElementById('calcSearchInput');
+        calcSearchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const filtered = database.filter(item =>
+                item.name.toLowerCase().includes(query) ||
+                item.spec.toLowerCase().includes(query) ||
+                (item.itemCode && item.itemCode.toLowerCase().includes(query))
+            );
+            populateCalcSelect(filtered);
+            updateCalculatorSpeed();
+            calculateModeA();
+            calculateModeB();
+        });
+
+        function initCalculator() {
+            populateCalcSelect(database);
+            updateCalculatorSpeed();
+        }
+
+        function updateCalculatorSpeed() {
+            const selectedId = calcItemSelect.value;
+            const item = database.find(t => t.id === selectedId);
+            if (item) {
+                const displayUnit = extractUnit(item.spec);
+                calcSpeedIndicator.textContent = `作業速度: ${item.speedPerMin} ${displayUnit} / 分鐘 (單人)`;
+                calcSpecLabel.textContent = displayUnit;
+                calcUnitLabel.textContent = displayUnit;
+            } else {
+                calcSpeedIndicator.textContent = `作業速度: - / 分鐘`;
+                calcSpecLabel.textContent = "單位";
+                calcUnitLabel.textContent = "單位";
+            }
+        }
+
+        calcQtyInput.addEventListener('input', calculateModeA);
+        calcTimeInput.addEventListener('input', calculateModeB);
+
+        function calculateModeA() {
+            const selectedId = calcItemSelect.value;
+            const item = database.find(t => t.id === selectedId);
+            const qty = parseFloat(calcQtyInput.value) || 0;
+            const workers = parseInt(calcWorkersInput.value) || 1;
+
+            if (item && qty > 0) {
+                const mins = qty / item.speedPerMin / workers;
+                calcTimeResult.innerHTML = formatMinutesDetail(mins);
+            } else {
+                calcTimeResult.innerHTML = '0 分鐘';
+            }
+        }
+
+        function calculateModeB() {
+            const selectedId = calcItemSelect.value;
+            const item = database.find(t => t.id === selectedId);
+            const mins = parseFloat(calcTimeInput.value) || 0;
+            const workers = parseInt(calcWorkersInput.value) || 1;
+
+            if (item && mins > 0) {
+                const qty = mins * item.speedPerMin * workers;
+                calcQtyResult.textContent = Math.round(qty * 100) / 100;
+            } else {
+                calcQtyResult.textContent = '0';
+            }
+        }
+
+        // Clear Scheduled List
+        document.getElementById('btnClearScheduled').addEventListener('click', () => {
+            if (scheduledListA.length === 0 && scheduledListB.length === 0) return;
+            if (confirm('確定要清空今日的所有排程嗎？')) {
+                scheduledListA = [];
+                scheduledListB = [];
+                renderScheduledA();
+                renderScheduledB();
+                updateGrandSummary();
+            }
+        });
+
+        // Initialize App Elements
+        initModalSidebar();
+        initGroupSelect();
+        initCalculator();
+        renderBacklog();
+        renderScheduledA();
+        renderScheduledB();
+    </script>
+</body>
+
+</html>
